@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fixer — support that closes tickets</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151c;
+    --panel-2: #171b24;
+    --border: #262b36;
+    --text: #e8eaed;
+    --text-dim: #8b93a3;
+    --accent: #5b8cff;
+    --good: #3ecf8e;
+    --warn: #f5a623;
+    --bad: #ef5b5b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    padding: 24px 32px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel + .panel { margin-top: 20px; }
+  .panel h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+  }
+  #chat-log {
+    height: 260px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .msg { padding: 10px 12px; border-radius: 10px; font-size: 14px; line-height: 1.4; max-width: 90%; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: white; }
+  .msg.agent { align-self: flex-start; background: var(--panel-2); border: 1px solid var(--border); }
+  .chat-input { display: flex; gap: 8px; }
+  .chat-input input {
+    flex: 1;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+  }
+  .chat-input button {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .chat-input button:disabled { opacity: 0.5; cursor: default; }
+  .hint { font-size: 12px; color: var(--text-dim); margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill.resolved { background: rgba(62,207,142,0.15); color: var(--good); }
+  .pill.escalated { background: rgba(245,166,35,0.15); color: var(--warn); }
+  .pill.open { background: rgba(139,147,163,0.15); color: var(--text-dim); }
+  .pill.active { background: rgba(62,207,142,0.15); color: var(--good); }
+  .pill.suspended { background: rgba(239,91,91,0.15); color: var(--bad); }
+  .empty { color: var(--text-dim); font-size: 13px; padding: 12px 0; }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--good);
+    display: inline-block; margin-right: 6px;
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Fixer</h1>
+  <p>An AI support agent with real write access to accounts, orders, and tickets — built on Xano.</p>
+</header>
+
+<div class="layout">
+
+  <div>
+    <div class="panel">
+      <h2>Talk to Fixer</h2>
+
+      <!--
+        ElevenLabs Conversational AI widget.
+        Replace YOUR_ELEVENLABS_AGENT_ID once the agent is created.
+        The agent's tools should point at the fixer-actions REST endpoints below.
+      -->
+      <elevenlabs-convai agent-id="agent_5601m0wheafkf71b6ngj47w2k8kn"></elevenlabs-convai>
+      <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+
+      <div class="hint">Voice, powered by ElevenLabs. Prefer typing? Use the text fallback below, it talks to the same Xano agent and the same tools.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Text chat (fallback)</h2>
+      <div id="chat-log"></div>
+      <div class="chat-input">
+        <input id="chat-input" type="text" placeholder="e.g. Hi, I'm amara@northwind.io, order 1 didn't work, can I get a refund?" />
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2><span class="live-dot"></span>Live ticket feed</h2>
+      <table>
+        <thead>
+          <tr><th>Customer</th><th>Category</th><th>Action taken</th><th>Status</th></tr>
+        </thead>
+        <tbody id="tickets-body"></tbody>
+      </table>
+      <div id="tickets-empty" class="empty" style="display:none;">No tickets yet. Try the chat, or call the seed endpoint.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Customers</h2>
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Plan</th><th>Service</th></tr>
+        </thead>
+        <tbody id="customers-body"></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>Orders</h2>
+      <table>
+        <thead>
+          <tr><th>Order</th><th>Customer</th><th>Amount</th><th>Status</th></tr>
+        </thead>
+        <tbody id="orders-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE = "https://x8ki-letl-twmt.n7.xano.io";
+  const DASHBOARD = API_BASE + "/api:fixer-dashboard";
+
+  function pill(text, cls) {
+    return `<span class="pill ${cls}">${text}</span>`;
+  }
+
+  // Free-plan Xano instances cap requests at 10 per 20 seconds. One combined poll
+  // (3 requests) every 8s stays comfortably under that, with headroom for chat/voice
+  // calls happening at the same time.
+  let lastCustomers = [];
+
+  function renderTickets(items) {
+    const body = document.getElementById("tickets-body");
+    const empty = document.getElementById("tickets-empty");
+    if (!items.length) {
+      body.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    body.innerHTML = items.map(t => `
+      <tr>
+        <td>${t.customer_name || "—"}</td>
+        <td>${t.category}</td>
+        <td>${t.action_taken || t.reason || "—"}</td>
+        <td>${pill(t.status, t.status)}</td>
+      </tr>
+    `).join("");
+  }
+
+  function renderCustomers(items) {
+    document.getElementById("customers-body").innerHTML = items.map(c => `
+      <tr>
+        <td>${c.name}</td>
+        <td>${c.email}</td>
+        <td>${c.plan}</td>
+        <td>${pill(c.service_status, c.service_status)}</td>
+      </tr>
+    `).join("");
+  }
+
+  function renderOrders(items, customers) {
+    const byId = Object.fromEntries(customers.map(c => [c.id, c.name]));
+    document.getElementById("orders-body").innerHTML = items.map(o => `
+      <tr>
+        <td>#${o.id}</td>
+        <td>${byId[o.customer_id] || o.customer_id}</td>
+        <td>$${Number(o.amount).toFixed(2)}</td>
+        <td>${pill(o.status, o.status === "refunded" ? "escalated" : (o.status === "delivered" ? "active" : "open"))}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function refreshAll() {
+    try {
+      const [ticketsRes, customersRes, ordersRes] = await Promise.all([
+        fetch(DASHBOARD + "/tickets"),
+        fetch(DASHBOARD + "/customers"),
+        fetch(DASHBOARD + "/orders"),
+      ]);
+      if (ticketsRes.status === 429) return; // skip this tick, try again next cycle
+      const tickets = await ticketsRes.json();
+      const customers = await customersRes.json();
+      const orders = await ordersRes.json();
+      lastCustomers = customers;
+      renderTickets(tickets.items || []);
+      renderCustomers(customers);
+      renderOrders(orders, customers);
+    } catch (e) { /* dashboard keeps its last known state on a transient fetch error */ }
+  }
+  refreshAll();
+  setInterval(refreshAll, 8000);
+
+  const chatLog = document.getElementById("chat-log");
+  const chatInput = document.getElementById("chat-input");
+  const chatSend = document.getElementById("chat-send");
+
+  function addMessage(text, who) {
+    const div = document.createElement("div");
+    div.className = "msg " + who;
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  async function sendChat() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+    addMessage(message, "user");
+    chatInput.value = "";
+    chatSend.disabled = true;
+    try {
+      const res = await fetch(DASHBOARD + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      addMessage(data.result || "Sorry, something went wrong on my end.", "agent");
+      refreshAll();
+    } catch (e) {
+      addMessage("Couldn't reach Fixer. Check the connection and try again.", "agent");
+    } finally {
+      chatSend.disabled = false;
+    }
+  }
+
+  chatSend.addEventListener("click", sendChat);
+  chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+</script>
+
+</body>
+</html>

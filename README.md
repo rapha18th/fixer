@@ -25,10 +25,11 @@ Zendesk and Intercom's habit of deflecting instead of resolving. Most AI support
    ```bash
    xano workspace push -w <your_workspace_id>
    ```
-3. Seed demo data:
+3. Seed demo data (customers, orders, and a few resolved/escalated tickets for a fictional business, "Loopline"):
    ```bash
-   curl -X POST https://<your-instance>.xano.io/api:fixer-dashboard/seed
+   curl -X POST https://<your-instance>.xano.io/api:fixer-dashboard/reset-demo
    ```
+   This is destructive (it truncates and reseeds `customer`, `order`, and `ticket`), so it's safe to re-run before every demo take.
 4. Serve the dashboard:
    ```bash
    cd static && python -m http.server 8123

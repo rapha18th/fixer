@@ -13,6 +13,7 @@
     --text: #e8eaed;
     --text-dim: #8b93a3;
     --accent: #5b8cff;
+    --company: #a78bfa;
     --good: #3ecf8e;
     --warn: #f5a623;
     --bad: #ef5b5b;
@@ -36,14 +37,35 @@
   .layout {
     display: grid;
     grid-template-columns: 380px 1fr;
-    gap: 24px;
+    gap: 32px;
     padding: 24px 32px;
     max-width: 1200px;
     margin: 0 auto;
+    align-items: start;
   }
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
   }
+  .side-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .side-label.customer { color: var(--accent); }
+  .side-label.company { color: var(--company); }
+  .side-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 0 0 16px;
+  }
+  .side {
+    border-top: 2px solid transparent;
+    padding-top: 16px;
+  }
+  .side.customer { border-top-color: var(--accent); }
+  .side.company { border-top-color: var(--company); }
   .panel {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -106,6 +128,11 @@
     animation: pulse 1.6s infinite;
   }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .resolution-panel { border-color: var(--accent); }
+  .resolution-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .resolution-detail { font-size: 14px; }
+  .resolution-for { font-size: 12px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -117,7 +144,10 @@
 
 <div class="layout">
 
-  <div>
+  <div class="side customer">
+    <div class="side-label customer">Customer</div>
+    <p class="side-sub">What the person contacting support sees and hears.</p>
+
     <div class="panel">
       <h2>Talk to Fixer</h2>
 
@@ -131,6 +161,11 @@
       <div class="hint">Voice, powered by ElevenLabs. Prefer typing? Use the text fallback below, it talks to the same Xano agent and the same tools.</div>
     </div>
 
+    <div class="panel resolution-panel" id="resolution-panel" style="display:none;">
+      <h2>Your resolution</h2>
+      <div id="resolution-body"></div>
+    </div>
+
     <div class="panel">
       <h2>Text chat (fallback)</h2>
       <div id="chat-log"></div>
@@ -141,7 +176,10 @@
     </div>
   </div>
 
-  <div>
+  <div class="side company">
+    <div class="side-label company">Loopline — internal</div>
+    <p class="side-sub">What the business sees. The customer never sees this side.</p>
+
     <div class="panel">
       <h2><span class="live-dot"></span>Live ticket feed</h2>
       <table>
@@ -184,9 +222,6 @@
     return `<span class="pill ${cls}">${text}</span>`;
   }
 
-  // Free-plan Xano instances cap requests at 10 per 20 seconds. One combined poll
-  // (3 requests) every 8s stays comfortably under that, with headroom for chat/voice
-  // calls happening at the same time.
   let lastCustomers = [];
 
   function renderTickets(items) {
@@ -206,6 +241,27 @@
         <td>${pill(t.status, t.status)}</td>
       </tr>
     `).join("");
+  }
+
+  // The customer-facing outcome of the newest ticket. Same data as the
+  // internal feed, read as a plain result instead of an audit log row.
+  function renderResolution(latest) {
+    const panel = document.getElementById("resolution-panel");
+    const body = document.getElementById("resolution-body");
+    if (!latest) {
+      panel.style.display = "none";
+      return;
+    }
+    panel.style.display = "block";
+    const label = latest.status === "escalated" ? "Escalated to a human" : "Resolved";
+    const detail = latest.action_taken || latest.reason || "A team member will follow up.";
+    body.innerHTML = `
+      <div class="resolution-row">
+        ${pill(label, latest.status)}
+        <span class="resolution-detail">${detail}</span>
+      </div>
+      <div class="resolution-for">For ${latest.customer_name || "you"}</div>
+    `;
   }
 
   function renderCustomers(items) {
@@ -231,6 +287,9 @@
     `).join("");
   }
 
+  // Free-plan Xano instances cap requests at 10 per 20 seconds. One combined poll
+  // (3 requests) every 25s stays comfortably under that, with headroom for chat/voice
+  // calls happening at the same time.
   async function refreshAll() {
     try {
       const [ticketsRes, customersRes, ordersRes] = await Promise.all([
@@ -243,14 +302,14 @@
       const customers = await customersRes.json();
       const orders = await ordersRes.json();
       lastCustomers = customers;
-      renderTickets(tickets.items || []);
+      const items = tickets.items || [];
+      renderTickets(items);
+      renderResolution(items[0]);
       renderCustomers(customers);
       renderOrders(orders, customers);
     } catch (e) { /* dashboard keeps its last known state on a transient fetch error */ }
   }
   refreshAll();
-  // 25s, not 8s: the dashboard's 3 requests/cycle need to leave real headroom
-  // in Xano's 10-req/20s free-plan cap for actual tool calls from the widget.
   setInterval(refreshAll, 25000);
 
   const chatLog = document.getElementById("chat-log");

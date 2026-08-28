@@ -249,7 +249,9 @@
     } catch (e) { /* dashboard keeps its last known state on a transient fetch error */ }
   }
   refreshAll();
-  setInterval(refreshAll, 8000);
+  // 25s, not 8s: the dashboard's 3 requests/cycle need to leave real headroom
+  // in Xano's 10-req/20s free-plan cap for actual tool calls from the widget.
+  setInterval(refreshAll, 25000);
 
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");

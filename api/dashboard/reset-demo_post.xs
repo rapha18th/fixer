@@ -26,6 +26,9 @@ query "reset-demo" verb=POST {
     db.add "customer" {
       data = { name: "Tobias Reinholt", email: "tobias@haventech.no", plan: "free", service_status: "active" }
     } as $c6
+    db.add "customer" {
+      data = { name: "Rairo Mukamuri", email: "rairorr@gmail.com", plan: "pro", service_status: "active" }
+    } as $c7
 
     db.add "order" { data = { customer_id: $c1.id, amount: 149.00, status: "delivered" } } as $o1
     db.add "order" { data = { customer_id: $c2.id, amount: 29.00, status: "pending" } } as $o2
@@ -33,6 +36,7 @@ query "reset-demo" verb=POST {
     db.add "order" { data = { customer_id: $c4.id, amount: 49.00, status: "refunded" } } as $o4
     db.add "order" { data = { customer_id: $c5.id, amount: 199.00, status: "delivered" } } as $o5
     db.add "order" { data = { customer_id: $c6.id, amount: 19.00, status: "pending" } } as $o6
+    db.add "order" { data = { customer_id: $c7.id, amount: 89.00, status: "delivered" } } as $o7
 
     db.add "ticket" {
       data = {
@@ -66,8 +70,8 @@ query "reset-demo" verb=POST {
   response = {
     reset: true,
     business: "Loopline",
-    customers: 6,
-    orders: 6,
+    customers: 7,
+    orders: 7,
     tickets: 3
   }
   guid = "hTgCFBEVYtuXhKDPhYsmySZICaQ"

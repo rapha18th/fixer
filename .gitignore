@@ -1,3 +1,6 @@
 node_modules/
 .env
 *.log
+
+# Working doc for the Devpost submission. Not part of the public repo.
+SUBMISSION.md

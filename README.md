@@ -2,6 +2,8 @@
 
 An AI support agent with real write access to accounts, orders, and tickets. Built on Xano for the DevNetwork [API + Cloud + AI] Hackathon 2026, Xano challenge track ("Rebuild a SaaS Tool You Hate").
 
+**Live demo:** https://fixer-prod-d3f2ce-xtep-pkor-hwou.n7e.xano.io, hosted directly on Xano's static hosting, backend and frontend on the same platform.
+
 Most AI support bots answer questions. Fixer checks order status, issues refunds, restarts suspended services, extends trials, and escalates to a human, and every action lands in a database with a full audit trail. It replaces the part of Zendesk and Intercom that never actually works: the layer that talks but can't touch your account.
 
 ![Architecture](architecture.png)
@@ -37,19 +39,24 @@ Five tools, all backed by real XanoScript logic, not canned responses:
    ```bash
    xano workspace push -w <your_workspace_id>
    ```
-3. Seed demo data (one customer, two orders in different states, ready to test every case):
+3. Seed demo data (five fictional customers, each set up to demo one of the five tools, ready to test every case):
    ```bash
    curl -X POST https://<your-instance>.xano.io/api:fixer-dashboard/reset-demo
    ```
    This is destructive (it truncates and reseeds `customer`, `order`, and `ticket`), so it's safe to re-run before every demo take.
-4. Serve the dashboard:
+4. Create an ElevenLabs Conversational AI agent, add the five `fixer-actions` endpoints as webhook tools, and paste the agent ID into the `elevenlabs-convai` tag in `static/index.html`.
+5. Update `API_BASE` in `static/index.html` to your instance URL, then either serve it locally:
    ```bash
    cd static && python -m http.server 8127
    ```
-   Update `API_BASE` in `static/index.html` to your instance URL.
-5. Create an ElevenLabs Conversational AI agent, add the five `fixer-actions` endpoints as webhook tools, and paste the agent ID into the `elevenlabs-convai` tag in `static/index.html`.
+   or push it to Xano's own static hosting:
+   ```bash
+   xano static_host create fixer
+   xano static_host build push fixer -d ./static -n "launch"
+   xano static_host deploy fixer --build_id <id> --env prod
+   ```
 
-**Note:** Xano's Free plan rate-limits at 10 requests per 20 seconds. The dashboard polls all three read endpoints together every 25 seconds to leave room for live tool calls.
+**Note:** on a free-plan instance, Xano rate-limits at 10 requests per 20 seconds; the dashboard's polling interval accounts for that. An Essential-plan instance has no such limit.
 
 ## Build story
 

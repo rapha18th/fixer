@@ -215,7 +215,7 @@
 </div>
 
 <script>
-  const API_BASE = "https://x8ki-letl-twmt.n7.xano.io";
+  const API_BASE = "https://xtep-pkor-hwou.n7e.xano.io";
   const DASHBOARD = API_BASE + "/api:fixer-dashboard";
 
   function pill(text, cls) {
@@ -287,9 +287,8 @@
     `).join("");
   }
 
-  // Free-plan Xano instances cap requests at 10 per 20 seconds. One combined poll
-  // (3 requests) every 25s stays comfortably under that, with headroom for chat/voice
-  // calls happening at the same time.
+  // Essential-plan instances carry no API rate limit, so this polls fast enough
+  // to feel live without the earlier free-plan throttling workaround.
   async function refreshAll() {
     try {
       const [ticketsRes, customersRes, ordersRes] = await Promise.all([
@@ -310,7 +309,7 @@
     } catch (e) { /* dashboard keeps its last known state on a transient fetch error */ }
   }
   refreshAll();
-  setInterval(refreshAll, 25000);
+  setInterval(refreshAll, 5000);
 
   const chatLog = document.getElementById("chat-log");
   const chatInput = document.getElementById("chat-input");
